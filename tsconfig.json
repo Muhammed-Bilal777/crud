@@ -7,8 +7,9 @@
     "strict": true,
     "types": ["jest", "node"],
     "esModuleInterop": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "skipLibCheck": true
   },
-  "include": ["src", "tests", "jest.config.ts"], // 👈 include tests + config
+  "include": ["src", "tests", "jest.config.ts"],
   "exclude": ["node_modules", "dist"]
 }
