@@ -1,27 +1,93 @@
 version: "3.9"
 
 services:
-  api:
+  ### ──────────────────────────── APP ───────────────────────────── ###
+  app:
     build: .
-    ports:
-      - "3000:3000"
+    container_name: node-app
     environment:
-      - PORT=3000
-      - MONGO_URI=mongodb://mongo:27017/personDB
+      # ─ OpenTelemetry ─
+      OTEL_EXPORTER_ZIPKIN_ENDPOINT: "http://zipkin:9411/api/v2/spans"
+      OTEL_METRIC_EXPORT_INTERVAL: "10000" # ms
+      # ─ Mongo connection (example) ─
+      MONGO_URL: mongodb://mongo:27017/mydb
+    ports:
+      - "4000:4000" # REST / gRPC ­/ etc.
+      - "9464:9464" # Prometheus scrape endpoint exposed by SDK
     depends_on:
       - mongo
-    volumes:
-      - .:/app
-      - /app/node_modules
-    command: npm run dev # uses nodemon for development
+      - zipkin
+    networks: [observability]
 
+  ### ────────────────────────── DATABASE ─────────────────────────── ###
   mongo:
-    image: mongo:6.0
-    container_name: mongodb
-    ports:
-      - "27017:27017"
+    image: mongo:latest
+    restart: unless-stopped
     volumes:
       - mongo-data:/data/db
+    ports:
+      - "27017:27017"
+    networks: [observability]
+
+  ### ────────────────────────── TRACING ──────────────────────────── ###
+  zipkin:
+    image: openzipkin/zipkin:latest
+    restart: unless-stopped
+    ports:
+      - "9411:9411"
+    networks: [observability]
+
+  ### ────────────────────────── METRICS ──────────────────────────── ###
+  prometheus:
+    image: prom/prometheus:latest
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prom-data:/prometheus
+    ports:
+      - "9090:9090"
+    networks: [observability]
+
+  ### ─────────────────────────── LOGS ────────────────────────────── ###
+  loki:
+    image: grafana/loki:3.0.0
+    restart: unless-stopped
+    command: -config.file=/etc/loki/local-config.yaml
+    ports:
+      - "3100:3100"
+    networks: [observability]
+
+  promtail:
+    image: grafana/promtail:latest
+    restart: unless-stopped
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - ./promtail-config.yml:/etc/promtail/promtail-config.yml:ro
+    command: -config.file=/etc/promtail/promtail-config.yml
+    depends_on: [loki]
+    networks: [observability]
+
+  ### ────────────────────────── GRAFANA ──────────────────────────── ###
+  grafana:
+    image: grafana/grafana:11.0.0
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/datasource.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+      - ./grafana/dashboard.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: "admin"
+    depends_on: [prometheus, loki]
+    networks: [observability]
+
+networks:
+  observability:
 
 volumes:
   mongo-data:
+  prom-data:
+  grafana-data:

@@ -11,11 +11,14 @@ RUN yarn install
 # Copy remaining source files
 COPY . .
 
+RUN yarn cache clean
 # Build TypeScript
-RUN npm run build
+RUN yarn run build
 
 # Expose port
-EXPOSE 3000
+EXPOSE 4000
 
 # Start the server
-CMD ["node", "dist/index.js"]
+CMD ["node", "dist/src/index.js"]
+
+

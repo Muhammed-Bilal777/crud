@@ -1,10 +1,12 @@
 import { Request, Response } from "express";
 import Person from "../models/person.model";
+import logger from "../logger/logger";
 
 export const createPerson = async (req: Request, res: Response) => {
   try {
     const person = new Person(req.body);
     await person.save();
+    logger.info("user created successfully");
     res.status(201).json(person);
   } catch (err) {
     res.status(400).json({ error: err });
@@ -36,6 +38,7 @@ export const updatePerson = async (req: Request, res: Response) => {
       new: true,
     });
     if (!person) return res.status(404).json({ message: "Person not found" });
+    logger.info("user updated successfully");
     res.json(person);
   } catch (err) {
     res.status(400).json({ error: err });
@@ -46,6 +49,7 @@ export const deletePerson = async (req: Request, res: Response) => {
   try {
     const person = await Person.findByIdAndDelete(req.params.id);
     if (!person) return res.status(404).json({ message: "Person not found" });
+    logger.info("user Deleted successfully");
     res.json({ message: "Deleted successfully" });
   } catch (err) {
     res.status(500).json({ error: err });
