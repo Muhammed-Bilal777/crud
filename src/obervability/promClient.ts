@@ -1,13 +1,44 @@
 import client from "prom-client";
-export const register = new client.Registry();
+import si from "systeminformation";
 
-// collect node process metrics (CPU, memory, event loop)
-client.collectDefaultMetrics({ register, prefix: "person_api_" });
+// Export a single shared registry
+export const registry = new client.Registry();
 
-// custom application counters
+// Collect default process metrics
+client.collectDefaultMetrics({ register: registry, prefix: "person_api_" });
+
+// HTTP Request Counter (Optional here if already declared elsewhere)
 export const reqCounter = new client.Counter({
-  name: "person_api_http_requests_total",
+  name: "http_requests_total",
   help: "Total HTTP requests",
-  registers: [register],
-  labelNames: ["method", "route", "code"],
+  registers: [registry],
+  labelNames: ["method", "route", "status"],
 });
+
+// System CPU Gauge
+export const cpuUsageGauge = new client.Gauge({
+  name: "system_cpu_usage_percent",
+  help: "System CPU usage percentage",
+  registers: [registry],
+});
+
+// System Memory Gauge
+export const memoryUsageGauge = new client.Gauge({
+  name: "system_memory_usage_percent",
+  help: "System memory usage percentage",
+  registers: [registry],
+});
+
+// Periodic system metric updates
+setInterval(async () => {
+  try {
+    const cpu = await si.currentLoad();
+    cpuUsageGauge.set(cpu.currentLoad); // Fix: lowercase `currentload`
+
+    const mem = await si.mem();
+    const usage = (mem.active / mem.total) * 100;
+    memoryUsageGauge.set(usage);
+  } catch (err) {
+    console.error("Error collecting system metrics:", err);
+  }
+}, 5000);

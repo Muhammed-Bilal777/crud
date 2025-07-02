@@ -1,28 +1,14 @@
-import "../src/obervability/tracing";
 import express from "express";
 import personRoutes from "./routes/person.routes";
-import client from "prom-client";
+import { registry, reqCounter } from "./obervability/promClient"; // ✅ use the same one
 
 const app = express();
-
-// ─────────── Prom‑client setup ───────────
-export const registry = new client.Registry();
-client.collectDefaultMetrics({ register: registry });
-
-export const reqCounter = new client.Counter({
-  name: "http_requests_total",
-  help: "Total HTTP requests",
-  registers: [registry],
-  labelNames: ["method", "route", "status"],
-});
 
 // ─────────── Middleware to count requests ───────────
 app.use((req, res, next) => {
   res.on("finish", () => {
-    // Skip Prometheus’ own scrape calls
     if (req.originalUrl === "/metrics") return;
 
-    // Record using the *full* URL path (no query‑string)
     reqCounter
       .labels(req.method, req.originalUrl.split("?")[0], String(res.statusCode))
       .inc();
